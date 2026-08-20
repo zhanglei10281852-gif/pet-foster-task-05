@@ -311,10 +311,22 @@ func (s *Service) ResetPassword(ctx context.Context, principal Principal, userID
 		return err
 	}
 	now := formatStoredTime(s.now())
-	if err := s.store.resetPasswordOnly(ctx, userID, string(hash), now); err != nil {
-		return fmt.Errorf("reset password: %w", err)
+	tx, err := s.store.db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
 	}
-	return nil
+	defer func() { _ = tx.Rollback() }()
+	result, err := tx.ExecContext(ctx, `UPDATE pet_users SET password_hash=?,update_time=? WHERE user_id=?`, string(hash), now, userID)
+	if err != nil {
+		return err
+	}
+	if err := requireAffected(result, ErrNotFound); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE pet_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL`, now, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func normalizePage(pageNum, pageSize int) (int, int) {

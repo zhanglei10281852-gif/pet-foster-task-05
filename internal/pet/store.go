@@ -61,14 +61,6 @@ func Open(ctx context.Context, path string) (*Store, error) {
 func (s *Store) Close() error                   { return s.db.Close() }
 func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
-func (s *Store) resetPasswordOnly(ctx context.Context, userID int64, hash, now string) error {
-	result, err := s.db.ExecContext(ctx, `UPDATE pet_users SET password_hash=?,update_time=? WHERE user_id=?`, hash, now, userID)
-	if err != nil {
-		return err
-	}
-	return requireAffected(result, ErrNotFound)
-}
-
 func (s *Store) migrate(ctx context.Context) error {
 	statements := []string{
 		`CREATE TABLE IF NOT EXISTS pet_schema_versions (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`,
